@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="th" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบสมัครชุมนุม - แอดมิน</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Sarabun', sans-serif;
+    }
+    .tab-active {
+      border-bottom: 3px solid #1e40af;
+      color: #1e3a8a;
+      background: #fcd34d;
+      font-weight: 700;
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+    .toast {
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    /* User filter button styles */
+    .user-filter {
+      border: 1px solid rgba(15,23,42,0.06);
+      color: #ffffff;
+      font-weight: 700;
+      transition: all 0.12s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .user-filter:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+    /* Default visible colors (before hover/active) */
+    #filter-all.user-filter { background: linear-gradient(90deg,#2563eb,#60a5fa); border-color: rgba(37,99,235,0.9); }
+    #filter-admin.user-filter { background: linear-gradient(90deg,#10b981,#34d399); border-color: rgba(16,185,129,0.9); }
+    #filter-student.user-filter { background: linear-gradient(90deg,#4b5563,#6b7280); border-color: rgba(75,85,99,0.9); }
+    /* Active states (stronger) */
+    #filter-all.tab-active { background: linear-gradient(90deg,#1e3a8a,#2563eb); color: white; border-color: rgba(37,99,235,0.9); }
+    #filter-admin.tab-active { background: linear-gradient(90deg,#059669,#10b981); color: white; border-color: rgba(16,185,129,0.9); }
+    #filter-student.tab-active { background: linear-gradient(90deg,#374151,#4b5563); color: white; border-color: rgba(75,85,99,0.9); }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #fbbf24 100%);">
+  <div id="app" class="h-full w-full overflow-auto"><!-- Header -->
+   <header class="shadow-lg border-b border-blue-400 sticky top-0 z-20" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
+    <div class="max-w-7xl mx-auto px-4 py-5">
+     <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+       <div id="logo-container" class="h-20 w-20bg-white bg-opacity-20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-white border-opacity-30 overflow-hidden">
+        <img src="club-logo.png" alt="Logo" class="h-full w-full object-cover">
+       </div>
+       <div>
+        <h1 id="system-title" class="text-3xl font-bold text-white drop-shadow-lg">🎯 ระบบสมัครชุมนุม</h1>
+        <p id="school-name" class="text-sm text-blue-100 drop-shadow mt-1">โรงเรียนพระประฐมวิทยาลัย</p>
+       </div>
+      </div>
+      <!-- Edit User Modal -->
+       <div id="edit-user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+         <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-bold text-gray-800">✏️ แก้ไขข้อมูลผู้ใช้</h3>
+          <button onclick="closeEditUserModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+         </div>
+         <form id="edit-user-form" class="space-y-3" onsubmit="saveUserChanges(event)">
+          <input type="hidden" id="edit-user-uid">
+          <div><label class="block text-sm font-medium text-gray-700">ชื่อ</label><input id="edit-user-firstname" class="w-full px-3 py-2 border rounded-lg" required></div>
+          <div><label class="block text-sm font-medium text-gray-700">นามสกุล</label><input id="edit-user-lastname" class="w-full px-3 py-2 border rounded-lg"></div>
+          <!-- email removed per requirement: do not use email -->
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-sm font-medium text-gray-700">เลขประจำตัว</label><input id="edit-user-studentId" class="w-full px-3 py-2 border rounded-lg"></div>
+            <div><label class="block text-sm font-medium text-gray-700">เลขที่</label><input id="edit-user-seat" class="w-full px-3 py-2 border rounded-lg"></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div><label class="block text-sm font-medium text-gray-700">ชั้น</label><input id="edit-user-level" class="w-full px-3 py-2 border rounded-lg"></div>
+            <div><label class="block text-sm font-medium text-gray-700">ห้อง</label><input id="edit-user-room" class="w-full px-3 py-2 border rounded-lg"></div>
+            <div><label class="block text-sm font-medium text-gray-700">บทบาท</label>
+              <select id="edit-user-role" class="w-full px-3 py-2 border rounded-lg">
+                <option value="student">student</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex gap-2 justify-end pt-3">
+            <button type="button" onclick="closeEditUserModal()" class="px-4 py-2 border rounded-lg">ยกเลิก</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">บันทึก</button>
+          </div>
+         </form>
+        </div>
+       </div>
+      <div class="flex items-center gap-3"><button onclick="openProfile()" class="px-4 py-2 bg-white bg-opacity-25 backdrop-blur-md text-white rounded-full text-sm font-semibold shadow-lg border border-white border-opacity-30 hover:bg-opacity-35 transition-all"> 👤 แอดมิน </button> <button onclick="logout()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full text-sm font-semibold shadow-lg transition-colors"> 🚪 ออกจากระบบ </button>
+      </div>
+     </div>
+    </div>
+   </header><!-- Navigation Tabs -->
+   <nav class="shadow-md sticky top-[81px] z-10" style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);">
+    <div class="max-w-7xl mx-auto px-4">
+    <div class="flex gap-1"><button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn tab-active px-6 py-4 font-semibold text-white hover:bg-yellow-600 hover:bg-opacity-30 transition-all rounded-t-lg"> 📊 แดชบอร์ด </button> <button onclick="switchTab('clubs')" id="tab-clubs" class="tab-btn px-6 py-4 font-semibold text-white hover:bg-yellow-600 hover:bg-opacity-30 transition-all rounded-t-lg"> 🎯 จัดการชุมนุม </button> <button onclick="switchTab('registrations')" id="tab-registrations" class="tab-btn px-6 py-4 font-semibold text-white hover:bg-yellow-600 hover:bg-opacity-30 transition-all rounded-t-lg"> 📝 รายการสมัคร </button> <button onclick="switchTab('users')" id="tab-users" class="tab-btn px-6 py-4 font-semibold text-white hover:bg-yellow-600 hover:bg-opacity-30 transition-all rounded-t-lg"> 👥 จัดการผู้ใช้ </button>
+     </div>
+    </div>
+   </nav><!-- Main Content -->
+   <main class="max-w-7xl mx-auto px-4 py-6"><!-- Dashboard Tab -->
+    <div id="content-dashboard" class="tab-content fade-in">
+     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl p-6 shadow-xl card-hover transition-all text-white">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-yellow-50 text-sm font-medium">ชุมนุมทั้งหมด</p>
+         <p id="stat-clubs" class="text-4xl font-bold mt-2">0</p>
+        </div>
+        <div class="w-14 h-14 bg-white bg-opacity-20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-3xl">
+         🎯
+        </div>
+       </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 card-hover transition-all">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-gray-500 text-sm">นักเรียนสมัครแล้ว</p>
+         <p id="stat-total-students" class="text-3xl font-bold text-blue-600">0</p>
+        </div>
+        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">
+         👨‍🎓
+        </div>
+       </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 card-hover transition-all">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-gray-500 text-sm">จำนวนการสมัคร</p>
+         <p id="stat-registered" class="text-3xl font-bold text-green-600">0</p>
+        </div>
+        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">
+         ✅
+        </div>
+       </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 card-hover transition-all">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-gray-500 text-sm">ชุมนุมว่าง</p>
+         <p id="stat-available" class="text-3xl font-bold text-teal-600">0</p>
+        </div>
+        <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-2xl">
+         💺
+        </div>
+       </div>
+      </div>
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 card-hover transition-all">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-gray-500 text-sm">ชุมนุมเต็ม</p>
+         <p id="stat-full" class="text-3xl font-bold text-red-600">0</p>
+        </div>
+        <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-2xl">
+         🚫
+        </div>
+       </div>
+      </div>
+     </div><!-- Club Comparison Chart -->
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 กราฟเปรียบเทียบชุมนุม</h3>
+      <div id="club-summary" class="space-y-3">
+       <p class="text-gray-500 text-center py-8">ยังไม่มีข้อมูลชุมนุม</p>
+      </div>
+     </div>
+    </div><!-- Clubs Management Tab -->
+    <div id="content-clubs" class="tab-content hidden fade-in">
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">➕ เพิ่มชุมนุมใหม่</h3>
+      <form id="add-club-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="club-code" class="block text-sm font-medium text-gray-700 mb-1">รหัสชุมนุม *</label> <input type="text" id="club-code" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น C001">
+       </div>
+       <div><label for="club-name" class="block text-sm font-medium text-gray-700 mb-1">ชื่อชุมนุม *</label> <input type="text" id="club-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น ชุมนุมดนตรี">
+       </div>
+       <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-2">ครูที่ปรึกษา *</label>
+        <div id="teachers-container" class="space-y-2">
+         <div class="flex gap-2"><input type="text" class="teacher-input flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น อ.สมชาย" required>
+         </div>
+        </div><button type="button" onclick="addTeacherField()" class="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"> ➕ เพิ่มครูที่ปรึกษา </button>
+       </div>
+      <div><label for="club-category" class="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่วิชา *</label> <select id="club-category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"> <option value="">-- เลือกหมวดหมู่ --</option> <option value="คณิต">คณิตศาสตร์</option> <option value="วิทย์">วิทยาศาสตร์</option> <option value="ภาษา">ภาษา</option> <option value="ศิลปะ&ดนตรี">ศิลปะ&ดนตรี</option> <option value="สังคม">สังคมศึกษา</option> <option value="พละ">พละและสุขศึกษา</option> <option value="อื่นๆ">อื่นๆ</option> </select>
+       </div>
+       <div><label for="club-max" class="block text-sm font-medium text-gray-700 mb-1">จำนวนที่นั่งสูงสุด *</label> <input type="number" id="club-max" required min="1" max="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="30">
+       </div>
+       <div class="md:col-span-2"><label for="club-desc" class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label> <input type="text" id="club-desc" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="รายละเอียดชุมนุม">
+       </div>
+       <div class="md:col-span-2"><button type="submit" id="add-club-btn" class="w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-lg"> เพิ่มชุมนุม </button>
+       </div>
+      </form>
+     </div>
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 รายการชุมนุม</h3>
+      <div id="clubs-list" class="space-y-3">
+       <p class="text-gray-500 text-center py-8">ยังไม่มีชุมนุม กรุณาเพิ่มชุมนุมใหม่</p>
+      </div>
+     </div>
+    </div><!-- Registrations Tab -->
+    <div id="content-registrations" class="tab-content hidden fade-in"><!-- Filter -->
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-4"><label for="filter-club" class="text-sm font-medium text-gray-700">กรองตามชุมนุม:</label> <select id="filter-club" onchange="filterRegistrations()" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"> <option value="">ทั้งหมด</option> </select> <input type="text" id="search-student" onkeyup="filterRegistrations()" placeholder="🔍 ค้นหาชื่อหรือเลขประจำตัว..." class="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+     </div>
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+       <h3 class="text-lg font-semibold text-gray-800">📝 รายชื่อนักเรียนที่สมัคร</h3>
+      <div class="flex items-center gap-2 flex-wrap"><span id="registration-count" class="text-sm text-gray-500">0 รายการ</span>
+      </div>
+      </div>
+      <div class="overflow-x-auto">
+       <table class="w-full">
+        <thead>
+         <tr class="bg-gray-50 text-left">
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600 rounded-l-lg">ลำดับ</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600">เลขประจำตัว</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600">ชื่อ-นามสกุล</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600">ชั้น/ห้อง</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600">ชุมนุม</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600">วันที่สมัคร</th>
+          <th class="px-4 py-3 text-sm font-semibold text-gray-600 rounded-r-lg">จัดการ</th>
+         </tr>
+        </thead>
+        <tbody id="registrations-table">
+         <tr>
+          <td colspan="7" class="text-center py-8 text-gray-500">ยังไม่มีนักเรียนสมัครชุมนุม</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div>
+    </div>
+   </main><!-- Toast Container -->
+   <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div><!-- Edit Club Modal -->
+   <div id="edit-club-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-xl font-bold text-gray-800">✏️ แก้ไขชุมนุม</h3>
+      <button onclick="closeEditClubModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+     </div>
+     <form id="edit-club-form" class="space-y-4" onsubmit="saveClubChanges(event)">
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">รหัสชุมนุม</label>
+       <input type="text" id="edit-club-code" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="รหัสชุมนุม" required>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อชุมนุม</label>
+       <input type="text" id="edit-club-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="ชื่อชุมนุม" required>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">หมวดหมู่</label>
+       <select id="edit-club-category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+        <option value="">-- เลือกหมวดหมู่ --</option>
+        <option value="คณิต">คณิตศาสตร์</option>
+        <option value="วิทย์">วิทยาศาสตร์</option>
+        <option value="ภาษา">ภาษา</option>
+        <option value="สังคม">สังคมศึกษา</option>
+        <option value="พละ">พละและสุขศึกษา</option>
+        <option value="ศิลปะ&ดนตรี">ศิลปะ&ดนตรี</option>
+        <option value="อื่นๆ">อื่นๆ</option>
+       </select>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">ครูที่ปรึกษา</label>
+       <input type="text" id="edit-club-teacher" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="ครูที่ปรึกษา" required>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">รายละเอียด</label>
+       <textarea id="edit-club-description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="รายละเอียดชุมนุม" required></textarea>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-gray-700 mb-2">จำนวนสมาชิกสูงสุด</label>
+       <input type="number" id="edit-club-max-members" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="จำนวนสมาชิก" required>
+      </div>
+      <div class="flex gap-3 pt-4 border-t border-gray-200">
+       <button type="button" onclick="closeEditClubModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">ยกเลิก</button>
+       <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">บันทึก</button>
+      </div>
+     </form>
+    </div>
+   </div><!-- Delete Confirmation Modal -->
+   <div id="delete-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl">
+     <h3 class="text-lg font-semibold text-gray-800 mb-2">⚠️ ยืนยันการลบ</h3>
+     <p id="delete-modal-text" class="text-gray-600 mb-4">คุณต้องการลบรายการนี้หรือไม่?</p>
+     <div class="flex gap-3 justify-end"><button onclick="closeDeleteModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">ยกเลิก</button> <button id="confirm-delete-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">ลบ</button>
+     </div>
+    </div>
+   </div><!-- Profile Modal -->
+   <div id="profile-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-xl font-bold text-gray-800">👤 โปรไฟล์แอดมิน</h3><button onclick="closeProfile()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+     </div>
+     <div class="space-y-4"><!-- Profile Info -->
+      <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-100">
+       <div class="flex items-center gap-4">
+        <div class="relative">
+         <div id="profile-avatar" class="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity overflow-hidden" onclick="document.getElementById('avatar-input').click()">
+          A
+         </div>
+         <div class="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer" onclick="document.getElementById('avatar-input').click()">
+          📷
+         </div><input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
+        </div>
+        <div>
+         <p class="font-semibold text-gray-800" id="profile-username">admin</p>
+         <p class="text-sm text-gray-500">ผู้ดูแลระบบ</p>
+        </div>
+       </div>
+      </div><!-- Edit Profile Form -->
+      <form id="profile-form" class="space-y-4">
+       <div><label for="edit-username" class="block text-sm font-medium text-gray-700 mb-1">ชื่อผู้ใช้</label> <input type="text" id="edit-username" value="admin" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="ชื่อผู้ใช้">
+       </div><button type="submit" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"> 💾 บันทึกข้อมูล </button>
+      </form>
+      <div class="border-t border-gray-200 pt-4"><button onclick="openChangePassword()" class="w-full px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors font-medium"> 🔐 เปลี่ยนรหัสผ่าน </button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Change Password Modal -->
+   <div id="password-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-xl font-bold text-gray-800">🔐 เปลี่ยนรหัสผ่าน</h3><button onclick="closeChangePassword()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+     </div>
+     <form id="password-form" class="space-y-4">
+      <div><label for="current-password" class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่านปัจจุบัน</label> <input type="password" id="current-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="••••••••">
+      </div>
+      <div><label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่านใหม่</label> <input type="password" id="new-password" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="••••••••">
+       <p class="text-xs text-gray-500 mt-1">รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร</p>
+      </div>
+      <div><label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">ยืนยันรหัสผ่านใหม่</label> <input type="password" id="confirm-password" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="••••••••">
+      </div>
+      <div class="flex gap-3"><button type="button" onclick="closeChangePassword()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"> ยกเลิก </button> <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"> เปลี่ยนรหัสผ่าน </button>
+      </div>
+     </form>
+    </div>
+   </div>
+   <!-- Users Management Tab -->
+    <div id="content-users" class="tab-content hidden fade-in">
+     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">👥 จัดการผู้ใช้</h3>
+      <div class="mb-4">
+        <div class="flex items-center justify-between gap-2 p-2 bg-white border border-gray-100 rounded-lg">
+          <div class="flex gap-2 items-center">
+            <button id="filter-all" onclick="setUserRoleFilter('all')" class="px-3 py-2 user-filter rounded-lg">ทั้งหมด <span id="user-count-all" class="ml-2 text-xs text-white/80">-</span></button>
+            <button id="filter-admin" onclick="setUserRoleFilter('admin')" class="px-3 py-2 user-filter rounded-lg">แอดมิน <span id="user-count-admin" class="ml-2 text-xs text-white/80">-</span></button>
+            <button id="filter-student" onclick="setUserRoleFilter('student')" class="px-3 py-2 user-filter rounded-lg">นักเรียน <span id="user-count-student" class="ml-2 text-xs text-white/80">-</span></button>
+          </div>
+          <div class="flex items-center gap-2">
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-center">
+        <div class="md:col-span-2">
+          <input id="user-search" type="text" placeholder="ค้นหาผู้ใช้โดยชื่อ, อีเมล หรือเลขประจำตัว" oninput="renderUsersList()" class="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+        </div>
+      </div>
+
+      
+
+      <div id="users-list" class="space-y-3 max-h-[40vh] overflow-y-auto">
+        <p class="text-gray-500 text-center py-8">กำลังโหลดผู้ใช้...</p>
+      </div>
+     </div>
+    </div>
+  </div>
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCmDBt1LJLWUEljGQVjYcaJ5FJRm9pcM_k",
+      authDomain: "wedappis.firebaseapp.com",
+      databaseURL: "https://wedappis-default-rtdb.firebaseio.com",
+      projectId: "wedappis",
+      storageBucket: "wedappis.firebasestorage.app",
+      messagingSenderId: "838403173250",
+      appId: "1:838403173250:web:1f5fc5786c6c1104c4bd9b",
+      measurementId: "G-F73HSEZBBW"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Application state
+    let clubs = [];
+    let registrations = [];
+    let pendingDelete = null;
+    let isLoading = false;
+    let roleChecked = false;
+    // Current users filter: 'all' | 'admin' | 'student'
+    window.__user_role_filter = 'all';
+
+    // Check Admin Role
+    function checkAdminAccess() {
+      if (roleChecked) return;
+      
+      auth.onAuthStateChanged((user) => {
+        if (!user) {
+          roleChecked = true;
+          Swal.fire({
+            icon: 'warning',
+            title: 'กรุณาเข้าสู่ระบบ',
+            text: 'คุณต้องเข้าสู่ระบบเพื่อเข้าถึงหน้า Admin',
+            confirmButtonColor: '#6d83f2',
+            allowOutsideClick: false,
+            allowEscapeKey: false
+          }).then(() => {
+            window.location.href = 'index.html';
+          });
+          return;
+        }
+
+        db.ref('users/' + user.uid).once('value').then((snapshot) => {
+          const userData = snapshot.val();
+          roleChecked = true;
+          
+          if (!userData || userData.role !== 'admin') {
+            Swal.fire({
+              icon: 'error',
+              title: 'ปฏิเสธการเข้าถึง',
+              text: 'คุณไม่มีสิทธิ์เข้าถึงหน้า Admin (เฉพาะ Admin เท่านั้น)',
+              confirmButtonColor: '#6d83f2',
+              allowOutsideClick: false,
+              allowEscapeKey: false
+            }).then(() => {
+              window.location.href = 'index.html';
+            });
+            return;
+          }
+
+          console.log('Admin access granted for:', userData.firstname);
+          loadAllData();
+        }).catch((error) => {
+          console.error('Error checking role:', error);
+          if (!roleChecked) {
+            roleChecked = true;
+            window.location.href = 'index.html';
+          }
+        });
+      });
+    }
+
+    // Load all data from Firebase
+    function loadAllData() {
+      db.ref('clubs').on('value', (snapshot) => {
+        clubs = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            clubs.push({
+              __backendId: childSnapshot.key,
+              ...childSnapshot.val()
+            });
+          });
+        }
+        console.log('Clubs loaded:', clubs.length);
+        updateDashboard();
+        renderClubsList();
+        updateClubSelects();
+      });
+
+      db.ref('registrations').on('value', (snapshot) => {
+        registrations = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            registrations.push({
+              __backendId: childSnapshot.key,
+              ...childSnapshot.val()
+            });
+          });
+        }
+        console.log('Registrations loaded:', registrations.length);
+        updateDashboard();
+        renderRegistrationsTable();
+        updateClubSelects();
+      });
+
+      // Load users
+      db.ref('users').on('value', (snapshot) => {
+        const users = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((child) => {
+            users.push({ uid: child.key, ...child.val() });
+          });
+        }
+        window.__admin_users = users; // store globally for rendering
+        renderUsersList();
+        console.log('Users loaded:', users.length);
+      });
+    }
+
+    // CSV Export Function
+    function escapeCSV(value) {
+      if (value === null || value === undefined) return '';
+      const str = String(value);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }
+
+    function downloadCSV(filename, csvContent) {
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportAllRegistrations() {
+      if (registrations.length === 0) {
+        showToast('ไม่มีข้อมูลการสมัครให้ Export', 'error');
+        return;
+      }
+
+      const headers = ['ลำดับ', 'เลขประจำตัว', 'ชื่อ-นามสกุล', 'ชั้น/ห้อง', 'รหัสชุมนุม', 'ชื่อชุมนุม', 'หมวดหมู่', 'ครูที่ปรึกษา', 'วันที่สมัคร'];
+      let csv = headers.join(',') + '\n';
+
+      registrations.forEach((reg, index) => {
+        const club = clubs.find(c => c.__backendId === reg.club_id);
+        const date = reg.registered_at ? new Date(reg.registered_at).toLocaleDateString('th-TH') : '-';
+        
+        const row = [
+          index + 1,
+          escapeCSV(reg.student_id || '-'),
+          escapeCSV(reg.student_name || '-'),
+          escapeCSV(reg.student_class || '-'),
+          escapeCSV(club?.club_code || '-'),
+          escapeCSV(club?.name || 'ไม่พบชุมนุม'),
+          escapeCSV(club?.category || '-'),
+          escapeCSV(club?.teacher || '-'),
+          escapeCSV(date)
+        ];
+        
+        csv += row.join(',') + '\n';
+      });
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      downloadCSV(`รายชื่อนักเรียนทั้งหมด_${timestamp}.csv`, csv);
+      showToast('Export ข้อมูลสำเร็จ! 📥', 'success');
+    }
+
+    // Export members of a single club as CSV
+    function exportClub(clubId) {
+      const club = clubs.find(c => c.__backendId === clubId);
+      if (!club) {
+        showToast('ไม่พบข้อมูลชุมนุม', 'error');
+        return;
+      }
+
+      const members = registrations.filter(r => r.club_id === clubId);
+      if (members.length === 0) {
+        showToast('ชุมนุมนี้ยังไม่มีสมาชิก', 'error');
+        return;
+      }
+
+      const headers = ['ลำดับ', 'เลขประจำตัว', 'ชื่อ-นามสกุล', 'ชั้น/ห้อง', 'วันที่สมัคร'];
+      let csv = `ชุมนุม: ${club.name} (${club.club_code || ''})\n`;
+      csv += `หมวดหมู่: ${club.category || '-'}\n`;
+      csv += `ครูที่ปรึกษา: ${club.teacher || '-'}\n`;
+      csv += `จำนวนสมาชิก: ${members.length}/${club.max_members || 30}\n\n`;
+      csv += headers.join(',') + '\n';
+
+      members.forEach((member, idx) => {
+        const date = member.registered_at ? new Date(member.registered_at).toLocaleDateString('th-TH') : '-';
+        const row = [
+          idx + 1,
+          escapeCSV(member.student_id || '-'),
+          escapeCSV(member.student_name || '-'),
+          escapeCSV(member.student_class || '-'),
+          escapeCSV(date)
+        ];
+        csv += row.join(',') + '\n';
+      });
+
+      const timestamp = new Date().toISOString().slice(0,10);
+      const filename = `${club.name.replace(/\s+/g,'_') || 'club'}_${club.club_code || ''}_${timestamp}.csv`;
+      downloadCSV(filename, csv);
+      showToast('Export ข้อมูลชุมนุมสำเร็จ! 📥', 'success');
+    }
+
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+      
+      document.getElementById(`tab-${tab}`).classList.add('tab-active');
+      document.getElementById(`content-${tab}`).classList.remove('hidden');
+    }
+
+    // Add teacher field
+    function addTeacherField() {
+      const container = document.getElementById('teachers-container');
+      const fieldCount = container.querySelectorAll('.teacher-input').length;
+      
+      if (fieldCount >= 5) {
+        showToast('สามารถเพิ่มครูที่ปรึกษาได้สูงสุด 5 คน', 'error');
+        return;
+      }
+      
+      const newField = document.createElement('div');
+      newField.className = 'flex gap-2';
+      newField.innerHTML = `
+        <input type="text" class="teacher-input flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น อ.สมชาย">
+        <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors">
+          🗑️
+        </button>
+      `;
+      container.appendChild(newField);
+    }
+
+    // Update dashboard
+    function updateDashboard() {
+      const totalClubs = clubs.length;
+      const registeredStudents = registrations.length;
+      
+      let availableClubs = 0;
+      let fullClubs = 0;
+      
+      clubs.forEach(club => {
+        const memberCount = registrations.filter(r => r.club_id === club.__backendId).length;
+        const available = (club.max_members || 30) - memberCount;
+        if (available > 0) availableClubs++;
+        else fullClubs++;
+      });
+
+      document.getElementById('stat-clubs').textContent = totalClubs;
+      document.getElementById('stat-total-students').textContent = registeredStudents;
+      document.getElementById('stat-registered').textContent = registeredStudents;
+      document.getElementById('stat-available').textContent = availableClubs;
+      document.getElementById('stat-full').textContent = fullClubs;
+
+      const summaryContainer = document.getElementById('club-summary');
+      if (clubs.length === 0) {
+        summaryContainer.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีข้อมูลชุมนุม</p>';
+      } else {
+        const maxPossible = Math.max(...clubs.map(c => c.max_members || 30));
+        
+        summaryContainer.innerHTML = `
+          <div class="space-y-4">
+            ${clubs.map(club => {
+              const memberCount = registrations.filter(r => r.club_id === club.__backendId).length;
+              const maxMembers = club.max_members || 30;
+              const percentage = Math.round((memberCount / maxMembers) * 100);
+              const barWidth = Math.round((memberCount / maxPossible) * 100);
+              const maxBarWidth = Math.round((maxMembers / maxPossible) * 100);
+              
+              return `
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 bg-indigo-600 text-white rounded text-xs font-semibold">${club.club_code || 'N/A'}</span>
+                      <p class="font-medium text-gray-800">${club.name || 'ไม่ระบุชื่อ'}</p>
+                    </div>
+                    <span class="text-sm font-semibold ${percentage >= 100 ? 'text-red-600' : percentage >= 80 ? 'text-amber-600' : 'text-green-600'}">${memberCount}/${maxMembers} (${percentage}%)</span>
+                  </div>
+                  <div class="relative h-10 bg-gray-100 rounded-lg overflow-hidden">
+                    <div class="absolute h-full bg-gray-200 rounded-lg transition-all" style="width: ${maxBarWidth}%"></div>
+                    <div class="absolute h-full ${percentage >= 100 ? 'bg-red-500' : percentage >= 80 ? 'bg-amber-500' : 'bg-green-500'} rounded-lg transition-all flex items-center justify-end pr-2" style="width: ${barWidth}%">
+                      ${barWidth > 15 ? `<span class="text-white text-sm font-semibold">${memberCount}</span>` : ''}
+                    </div>
+                    ${barWidth <= 15 && memberCount > 0 ? `<span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-700 text-sm font-semibold">${memberCount}</span>` : ''}
+                  </div>
+                  <p class="text-xs text-gray-500">👨‍🏫 ${club.teacher || '-'}</p>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+    }
+
+    // Render clubs list
+    function renderClubsList() {
+      const container = document.getElementById('clubs-list');
+      
+      if (clubs.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีชุมนุม กรุณาเพิ่มชุมนุมใหม่</p>';
+        return;
+      }
+
+      container.innerHTML = clubs.map((club, index) => {
+        const memberCount = registrations.filter(r => r.club_id === club.__backendId).length;
+        const maxMembers = club.max_members || 30;
+        
+        return `
+          <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <div class="w-16 h-16 bg-indigo-100 rounded-lg flex items-center justify-center font-bold text-indigo-600">${index + 1}</div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 bg-indigo-600 text-white rounded text-xs font-semibold">${club.club_code || 'N/A'}</span>
+                <p class="font-semibold text-gray-800">${club.name || 'ไม่ระบุชื่อ'}</p>
+              </div>
+              <p class="text-sm text-gray-500">👨‍🏫 ${club.teacher || '-'} | ${club.description || 'ไม่มีรายละเอียด'}</p>
+            </div>
+            <div class="text-center px-4">
+              <p class="text-lg font-bold ${memberCount >= maxMembers ? 'text-red-600' : 'text-green-600'}">${memberCount}/${maxMembers}</p>
+              <p class="text-xs text-gray-500">สมาชิก</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="editClubForm('${club.__backendId}')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="แก้ไขชุมนุม">
+                ✏️ แก้ไข
+              </button>
+              <button onclick="exportClub('${club.__backendId}')" class="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors" title="Export รายชื่อ">
+                📥 Export
+              </button>
+              <button onclick="confirmDeleteClub('${club.__backendId}')" class="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title="ลบชุมนุม">
+                🗑️ ลบ
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render registrations table
+    function renderRegistrationsTable() {
+      const filterClub = document.getElementById('filter-club').value;
+      const searchTerm = document.getElementById('search-student').value.toLowerCase();
+      
+      let filtered = registrations;
+      
+      if (filterClub) {
+        filtered = filtered.filter(r => r.club_id === filterClub);
+      }
+      
+      if (searchTerm) {
+        filtered = filtered.filter(r => 
+          (r.student_name || '').toLowerCase().includes(searchTerm) ||
+          (r.student_id || '').toLowerCase().includes(searchTerm)
+        );
+      }
+
+      document.getElementById('registration-count').textContent = `${filtered.length} รายการ`;
+
+      const tbody = document.getElementById('registrations-table');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">ไม่พบข้อมูล</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((reg, index) => {
+        const club = clubs.find(c => c.__backendId === reg.club_id);
+        const date = reg.registered_at ? new Date(reg.registered_at).toLocaleDateString('th-TH') : '-';
+        
+        return `
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-600">${index + 1}</td>
+            <td class="px-4 py-3 font-medium text-gray-800">${reg.student_id || '-'}</td>
+            <td class="px-4 py-3 text-gray-800">${reg.student_name || '-'}</td>
+            <td class="px-4 py-3 text-gray-600">${reg.student_class || '-'}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">${club?.name || 'ไม่พบชุมนุม'}</span>
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-sm">${date}</td>
+            <td class="px-4 py-3">
+              <button onclick="confirmDeleteRegistration('${reg.__backendId}')" class="p-1 text-red-500 hover:bg-red-100 rounded transition-colors" title="ลบ">
+                🗑️
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Update club selects
+    function updateClubSelects() {
+      const options = clubs.map(club => {
+        const memberCount = registrations.filter(r => r.club_id === club.__backendId).length;
+        const maxMembers = club.max_members || 30;
+        const isFull = memberCount >= maxMembers;
+        
+        return `<option value="${club.__backendId}" ${isFull ? 'disabled' : ''}>${club.name || 'ไม่ระบุชื่อ'} (${memberCount}/${maxMembers})${isFull ? ' - เต็ม' : ''}</option>`;
+      }).join('');
+
+      document.getElementById('filter-club').innerHTML = '<option value="">ทั้งหมด</option>' + options;
+    }
+
+    // Users management functions
+    // NOTE: realtime listener in loadAllData() already updates users; no manual refresh needed.
+
+    function renderUsersList() {
+      const container = document.getElementById('users-list');
+      const q = (document.getElementById('user-search')?.value || '').toLowerCase();
+      const users = window.__admin_users || [];
+
+      // Compute counts
+      const totalCount = users.length;
+      const adminCount = users.filter(u => (u.role || 'student') === 'admin').length;
+      const studentCount = users.filter(u => (u.role || 'student') !== 'admin').length;
+      // Update count badges
+      const elAll = document.getElementById('user-count-all');
+      const elAdmin = document.getElementById('user-count-admin');
+      const elStudent = document.getElementById('user-count-student');
+      if (elAll) elAll.textContent = totalCount;
+      if (elAdmin) elAdmin.textContent = adminCount;
+      if (elStudent) elStudent.textContent = studentCount;
+
+      // Apply search
+      let filtered = users.filter(u => {
+        if (!q) return true;
+        const v = `${u.firstname || ''} ${u.lastname || ''} ${u.studentId || ''} ${u.level || ''} ${u.room || ''}`.toLowerCase();
+        return v.includes(q);
+      });
+
+      // Apply role filter
+      const roleFilter = window.__user_role_filter || 'all';
+      if (roleFilter === 'admin') {
+        filtered = filtered.filter(u => (u.role || 'student') === 'admin');
+      } else if (roleFilter === 'student') {
+        filtered = filtered.filter(u => (u.role || 'student') !== 'admin');
+      }
+
+      // Update filter button styles
+      ['all','admin','student'].forEach(r => {
+        const btn = document.getElementById('filter-' + r);
+        if (!btn) return;
+        if (r === roleFilter) {
+          btn.classList.add('tab-active');
+        } else {
+          btn.classList.remove('tab-active');
+        }
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">ไม่พบผู้ใช้</p>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(u => {
+        const role = u.role || 'student';
+        const name = `${u.firstname || ''} ${u.lastname || ''}`.trim() || (u.studentId || 'ไม่ระบุ');
+        const studentId = u.studentId || u.student_id || '-';
+        const classRoom = (u.level && u.room) ? `${u.level}/${u.room}` : (u.student_class || '-');
+        const seat = u.seat || u.number || u.no || '-';
+
+        return `
+          <div class="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg">
+            <div>
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-semibold">${escapeHtml((u.firstname||'').charAt(0) || 'U')}</div>
+                <div>
+                  <p class="font-semibold text-gray-800">${escapeHtml(name)}</p>
+                  <p class="text-xs text-gray-500">รหัส: ${escapeHtml(studentId)} • ชั้น/ห้อง: ${escapeHtml(classRoom)} • เลขที่: ${escapeHtml(seat)}</p>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="px-3 py-1 rounded-full text-sm ${role === 'admin' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${escapeHtml(role)}</span>
+              ${role === 'admin' ? `<button onclick="demoteUser('${u.uid}')" class="px-3 py-1 bg-red-500 text-white rounded-lg">ถอดสิทธิ์</button>` : `<button onclick="promoteUser('${u.uid}')" class="px-3 py-1 bg-amber-500 text-white rounded-lg">กำหนดเป็น Admin</button>`}
+              <button onclick="openEditUserModal('${u.uid}')" class="px-3 py-1 bg-blue-600 text-white rounded-lg">แก้ไข</button>
+              <button onclick="deleteUser('${u.uid}')" class="px-3 py-1 bg-red-600 text-white rounded-lg">ลบ</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setUserRoleFilter(role) {
+      window.__user_role_filter = role || 'all';
+      renderUsersList();
+    }
+
+    function escapeHtml(str) {
+      return String(str||'').replace(/[&<>"]+/g, function(s){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[s];
+      });
+    }
+
+    function promoteUser(uid) {
+      const user = (window.__admin_users || []).find(u => u.uid === uid);
+      if (!user) return showToast('ไม่พบผู้ใช้', 'error');
+
+      Swal.fire({
+        title: 'ยืนยัน',
+        text: `ต้องการกำหนด ${user.firstname || user.studentId || 'ผู้ใช้'} เป็น Admin หรือไม่?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ใช่, กำหนด',
+        cancelButtonText: 'ยกเลิก'
+      }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+          await db.ref('users/' + uid).update({ role: 'admin' });
+          showToast('กำหนดสิทธิ์เป็น Admin เรียบร้อย', 'success');
+        } catch (err) {
+          console.error('promote error', err);
+          showToast('ไม่สามารถกำหนดสิทธิ์ได้', 'error');
+        }
+      });
+    }
+
+    function demoteUser(uid) {
+      const user = (window.__admin_users || []).find(u => u.uid === uid);
+      if (!user) return showToast('ไม่พบผู้ใช้', 'error');
+
+      Swal.fire({
+        title: 'ยืนยัน',
+        text: `ต้องการถอดสิทธิ์ Admin ของ ${user.firstname || user.studentId || 'ผู้ใช้'} หรือไม่?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ใช่, ถอดสิทธิ์',
+        cancelButtonText: 'ยกเลิก'
+      }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+          await db.ref('users/' + uid).update({ role: 'student' });
+          showToast('ถอดสิทธิ์เรียบร้อย', 'success');
+        } catch (err) {
+          console.error('demote error', err);
+          showToast('ไม่สามารถถอดสิทธิ์ได้', 'error');
+        }
+      });
+    }
+
+    async function makeAdminByIdentifier(e) {
+      e.preventDefault();
+      const val = document.getElementById('make-admin-input').value.trim();
+      if (!val) return showToast('กรุณาใส่อีเมลหรือเลขประจำตัว', 'error');
+
+      const users = window.__admin_users || [];
+      const found = users.find(u => (u.studentId && u.studentId.toLowerCase() === val.toLowerCase()) || (u.student_id && u.student_id.toLowerCase() === val.toLowerCase()));
+      if (!found) return showToast('ไม่พบผู้ใช้ตามที่ระบุ', 'error');
+
+      try {
+        await db.ref('users/' + found.uid).update({ role: 'admin' });
+        showToast('กำหนดเป็น Admin เรียบร้อย', 'success');
+        document.getElementById('make-admin-input').value = '';
+      } catch (err) {
+        console.error('makeAdmin error', err);
+        showToast('ไม่สามารถกำหนดสิทธิ์ได้', 'error');
+      }
+    }
+
+    // Edit user modal handlers
+    let currentEditingUserId = null;
+    function openEditUserModal(uid) {
+      const user = (window.__admin_users || []).find(u => u.uid === uid);
+      if (!user) return showToast('ไม่พบผู้ใช้', 'error');
+      currentEditingUserId = uid;
+      document.getElementById('edit-user-uid').value = uid;
+      document.getElementById('edit-user-firstname').value = user.firstname || '';
+      document.getElementById('edit-user-lastname').value = user.lastname || '';
+      // email not used
+      document.getElementById('edit-user-studentId').value = user.studentId || user.student_id || '';
+      document.getElementById('edit-user-level').value = user.level || '';
+      document.getElementById('edit-user-room').value = user.room || '';
+      document.getElementById('edit-user-seat').value = user.seat || user.number || user.no || '';
+      document.getElementById('edit-user-role').value = user.role || 'student';
+      document.getElementById('edit-user-modal').classList.remove('hidden');
+    }
+
+    function closeEditUserModal() {
+      currentEditingUserId = null;
+      document.getElementById('edit-user-modal').classList.add('hidden');
+    }
+
+    async function saveUserChanges(e) {
+      e.preventDefault();
+      if (!currentEditingUserId) return;
+      const uid = currentEditingUserId;
+      const updates = {
+        firstname: document.getElementById('edit-user-firstname').value.trim(),
+        lastname: document.getElementById('edit-user-lastname').value.trim(),
+        // email removed from updates
+        studentId: document.getElementById('edit-user-studentId').value.trim(),
+        level: document.getElementById('edit-user-level').value.trim(),
+        room: document.getElementById('edit-user-room').value.trim(),
+        seat: document.getElementById('edit-user-seat').value.trim(),
+        role: document.getElementById('edit-user-role').value
+      };
+
+      try {
+        await db.ref('users/' + uid).update(updates);
+        showToast('บันทึกข้อมูลผู้ใช้สำเร็จ', 'success');
+        closeEditUserModal();
+      } catch (err) {
+        console.error('saveUserChanges error', err);
+        showToast('ไม่สามารถบันทึกข้อมูลได้', 'error');
+      }
+    }
+
+    async function deleteUser(uid) {
+      const user = (window.__admin_users || []).find(u => u.uid === uid);
+      if (!user) return showToast('ไม่พบผู้ใช้', 'error');
+
+      Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `ต้องการลบบัญชีของ ${user.firstname || user.studentId || 'ผู้ใช้'} หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ใช่, ลบ',
+        cancelButtonText: 'ยกเลิก'
+      }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+          // Remove related registrations by matching studentId if available
+          const studentId = user.studentId || user.student_id || null;
+          if (studentId) {
+            const regs = registrations.filter(r => (r.student_id || '').toString() === studentId.toString());
+            for (const r of regs) {
+              if (r.__backendId) await db.ref('registrations/' + r.__backendId).remove();
+            }
+          }
+
+          // Remove user node (note: does NOT delete from Firebase Auth)
+          await db.ref('users/' + uid).remove();
+          showToast('ลบบัญชีผู้ใช้เรียบร้อย', 'success');
+        } catch (err) {
+          console.error('deleteUser error', err);
+          showToast('ไม่สามารถลบบัญชีได้', 'error');
+        }
+      });
+    }
+
+    // Filter registrations
+    function filterRegistrations() {
+      renderRegistrationsTable();
+    }
+
+    // Add club form
+    document.getElementById('add-club-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (isLoading) return;
+
+      const clubCode = document.getElementById('club-code').value.trim();
+      const name = document.getElementById('club-name').value.trim();
+      const category = document.getElementById('club-category').value;
+      
+      const teacherInputs = document.querySelectorAll('.teacher-input');
+      const teachers = Array.from(teacherInputs)
+        .map(input => input.value.trim())
+        .filter(t => t !== '');
+      
+      const maxMembers = parseInt(document.getElementById('club-max').value) || 30;
+      const description = document.getElementById('club-desc').value.trim();
+
+      if (!clubCode || !name || !category || teachers.length === 0) {
+        showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
+        return;
+      }
+
+      const codeExists = clubs.find(c => c.club_code === clubCode);
+      if (codeExists) {
+        showToast('รหัสชุมนุมนี้มีอยู่แล้ว', 'error');
+        return;
+      }
+
+      isLoading = true;
+      const btn = document.getElementById('add-club-btn');
+      btn.disabled = true;
+      btn.textContent = 'กำลังเพิ่ม...';
+
+      try {
+        await db.ref('clubs').push().set({
+          type: 'club',
+          club_code: clubCode,
+          name: name,
+          category: category,
+          teacher: teachers.join(', '),
+          max_members: maxMembers,
+          description: description || 'ไม่มีรายละเอียด',
+          created_at: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        showToast('เพิ่มชุมนุมสำเร็จ! ✓', 'success');
+        document.getElementById('add-club-form').reset();
+        document.getElementById('teachers-container').innerHTML = `
+          <div class="flex gap-2">
+            <input type="text" class="teacher-input flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น อ.สมชาย" required>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error adding club:', error);
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      }
+
+      isLoading = false;
+      btn.disabled = false;
+      btn.textContent = 'เพิ่มชุมนุม';
+    });
+
+    // Delete functions
+    function confirmDeleteClub(id) {
+      const club = clubs.find(c => c.__backendId === id);
+      const memberCount = registrations.filter(r => r.club_id === id).length;
+      
+      document.getElementById('delete-modal-text').textContent = `คุณต้องการลบชุมนุม "${club?.name || ''}" หรือไม่? ${memberCount > 0 ? `(มีนักเรียน ${memberCount} คน จะถูกลบออกด้วย)` : ''}`;
+      document.getElementById('delete-modal').classList.remove('hidden');
+      
+      pendingDelete = { type: 'club', id };
+    }
+
+    // Edit club functions
+    let currentEditingClubId = null;
+
+    function editClubForm(clubId) {
+      const club = clubs.find(c => c.__backendId === clubId);
+      if (!club) return;
+
+      currentEditingClubId = clubId;
+      document.getElementById('edit-club-code').value = club.club_code || '';
+      document.getElementById('edit-club-name').value = club.name || '';
+      document.getElementById('edit-club-category').value = club.category || '';
+      document.getElementById('edit-club-teacher').value = club.teacher || '';
+      document.getElementById('edit-club-description').value = club.description || '';
+      document.getElementById('edit-club-max-members').value = club.max_members || 30;
+
+      document.getElementById('edit-club-modal').classList.remove('hidden');
+    }
+
+    function closeEditClubModal() {
+      document.getElementById('edit-club-modal').classList.add('hidden');
+      currentEditingClubId = null;
+    }
+
+    async function saveClubChanges(e) {
+      e.preventDefault();
+      if (!currentEditingClubId) return;
+
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'กำลังบันทึก...';
+
+      try {
+        await db.ref('clubs/' + currentEditingClubId).update({
+          club_code: document.getElementById('edit-club-code').value,
+          name: document.getElementById('edit-club-name').value,
+          category: document.getElementById('edit-club-category').value,
+          teacher: document.getElementById('edit-club-teacher').value,
+          description: document.getElementById('edit-club-description').value,
+          max_members: parseInt(document.getElementById('edit-club-max-members').value)
+        });
+
+        showToast('บันทึกการเปลี่ยนแปลงสำเร็จ! ✓', 'success');
+        closeEditClubModal();
+      } catch (error) {
+        console.error('Error saving club:', error);
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'บันทึก';
+    }
+
+    function confirmDeleteRegistration(id) {
+      const reg = registrations.find(r => r.__backendId === id);
+      
+      document.getElementById('delete-modal-text').textContent = `คุณต้องการลบการสมัครของ "${reg?.student_name || ''}" หรือไม่?`;
+      document.getElementById('delete-modal').classList.remove('hidden');
+      
+      pendingDelete = { type: 'registration', id };
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.add('hidden');
+      pendingDelete = null;
+    }
+
+    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+      if (!pendingDelete || isLoading) return;
+
+      isLoading = true;
+      const btn = document.getElementById('confirm-delete-btn');
+      btn.disabled = true;
+      btn.textContent = 'กำลังลบ...';
+
+      try {
+        if (pendingDelete.type === 'club') {
+          const club = clubs.find(c => c.__backendId === pendingDelete.id);
+          if (club) {
+            const clubRegistrations = registrations.filter(r => r.club_id === pendingDelete.id);
+            for (const reg of clubRegistrations) {
+              await db.ref('registrations/' + reg.__backendId).remove();
+            }
+            await db.ref('clubs/' + pendingDelete.id).remove();
+          }
+        } else if (pendingDelete.type === 'registration') {
+          await db.ref('registrations/' + pendingDelete.id).remove();
+        }
+
+        showToast('ลบข้อมูลสำเร็จ', 'success');
+      } catch (error) {
+        console.error('Error deleting:', error);
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      }
+
+      isLoading = false;
+      btn.disabled = false;
+      btn.textContent = 'ลบ';
+      
+      closeDeleteModal();
+    });
+
+    // Toast notification
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-indigo-500';
+      const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+      
+      toast.className = `toast ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2`;
+      toast.innerHTML = `<span class="font-bold">${icon}</span> ${message}`;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Profile management
+    function openProfile() {
+      const user = auth.currentUser;
+      if (!user) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'กรุณาเข้าสู่ระบบ',
+          text: 'กรุณาเข้าสู่ระบบเพื่อแก้ไขโปรไฟล์',
+          confirmButtonColor: '#6d83f2'
+        }).then(() => window.location.href = 'index.html');
+        return;
+      }
+
+      // Load profile from DB if available
+      db.ref('users/' + user.uid).once('value').then((snap) => {
+        const data = snap.val() || {};
+        const username = data.firstname ? (data.firstname + (data.lastname ? ' ' + data.lastname : '')) : (data.username || user.displayName || 'admin');
+        document.getElementById('profile-username').textContent = username;
+        document.getElementById('edit-username').value = username;
+
+        const avatarEl = document.getElementById('profile-avatar');
+        if (data.avatar) {
+          avatarEl.style.backgroundImage = `url(${data.avatar})`;
+          avatarEl.style.backgroundSize = 'cover';
+          avatarEl.style.backgroundPosition = 'center';
+          avatarEl.textContent = '';
+        }
+      }).catch((err) => {
+        console.error('Load profile error:', err);
+      }).finally(() => {
+        document.getElementById('profile-modal').classList.remove('hidden');
+      });
+    }
+
+    function closeProfile() {
+      document.getElementById('profile-modal').classList.add('hidden');
+    }
+
+    function handleAvatarChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate file size (max 2MB) and type (image/*)
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB', 'error');
+        return;
+      }
+
+      if (!file.type || !file.type.startsWith('image/')) {
+        showToast('กรุณาเลือกไฟล์รูปภาพหรือ GIF เท่านั้น', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const dataUrl = e.target.result;
+        const avatarEl = document.getElementById('profile-avatar');
+        avatarEl.style.backgroundImage = `url(${dataUrl})`;
+        avatarEl.style.backgroundSize = 'cover';
+        avatarEl.style.backgroundPosition = 'center';
+        avatarEl.textContent = '';
+
+        // Save avatar data URL to user's DB (simple approach)
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            await db.ref('users/' + user.uid).update({ avatar: dataUrl });
+            showToast('เปลี่ยนรูปโปรไฟล์สำเร็จ', 'success');
+          } catch (err) {
+            console.error('Save avatar error:', err);
+            showToast('ไม่สามารถบันทึกรูปได้', 'error');
+          }
+        } else {
+          showToast('เปลี่ยนรูปโปรไฟล์สำเร็จ (ยังไม่บันทึก)', 'success');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('profile-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('edit-username').value.trim();
+      if (!username) {
+        showToast('กรุณากรอกชื่อผู้ใช้', 'error');
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (!user) {
+        showToast('กรุณาเข้าสู่ระบบ', 'error');
+        return;
+      }
+
+      // Split into firstname / lastname (first token -> firstname, rest -> lastname)
+      const parts = username.split(' ').filter(p => p !== '');
+      const firstname = parts.length > 0 ? parts[0] : username;
+      const lastname = parts.length > 1 ? parts.slice(1).join(' ') : '';
+
+      try {
+        await db.ref('users/' + user.uid).update({ firstname, lastname });
+        try { await user.updateProfile({ displayName: username }); } catch (err) { console.warn('Auth updateProfile skipped', err); }
+        document.getElementById('profile-username').textContent = username;
+        showToast('บันทึกข้อมูลสำเร็จ', 'success');
+        setTimeout(() => closeProfile(), 1000);
+      } catch (err) {
+        console.error('Save profile error:', err);
+        showToast('ไม่สามารถบันทึกข้อมูลได้', 'error');
+      }
+    });
+
+    function openChangePassword() {
+      closeProfile();
+      document.getElementById('password-modal').classList.remove('hidden');
+    }
+
+    function closeChangePassword() {
+      document.getElementById('password-modal').classList.add('hidden');
+    }
+
+    document.getElementById('password-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      showToast('เปลี่ยนรหัสผ่านสำเร็จ', 'success');
+      setTimeout(() => closeChangePassword(), 1000);
+    });
+
+    function logout() {
+      Swal.fire({
+        icon: 'question',
+        title: 'ออกจากระบบ',
+        text: 'คุณต้องการออกจากระบบหรือไม่?',
+        showCancelButton: true,
+        confirmButtonText: 'ออก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#6366f1'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          auth.signOut().then(() => {
+            window.location.href = 'index.html';
+          });
+        }
+      });
+    }
+
+    // Initialize on page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', checkAdminAccess);
+    } else {
+      checkAdminAccess();
+    }
+  </script>
+ </body>
+</html>

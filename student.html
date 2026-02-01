@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="th" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบสมัครชุมนุม</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&amp;family=Prompt:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Prompt', 'Noto Sans Thai', sans-serif;
+    }
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .card-hover {
+      transition: all 0.3s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+    .category-badge {
+      transition: all 0.2s ease;
+    }
+    .category-badge:hover {
+      transform: scale(1.05);
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .decorative-bg {
+      position: relative;
+      background: linear-gradient(135deg, #f0f4ff 0%, #fff9e6 100%);
+    }
+    .decorative-bg::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        radial-gradient(circle at 20% 30%, rgba(36, 72, 235, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(250, 204, 21, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(36, 72, 235, 0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .decorative-bg::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(45deg, rgba(36, 72, 235, 0.03) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(250, 204, 21, 0.03) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(36, 72, 235, 0.03) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(250, 204, 21, 0.03) 75%);
+      background-size: 80px 80px;
+      background-position: 0 0, 0 40px, 40px -40px, -40px 0px;
+      pointer-events: none;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full bg-gray-50">
+  <div id="app" class="h-full overflow-auto"><!-- Main Dashboard -->
+   <div id="main-page" class="min-h-full decorative-bg"><!-- Header -->
+    <header class="shadow-sm sticky top-0 z-50" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
+     <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+       <div class="flex items-center gap-3">
+       <div class="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden">
+         <img src="club-logo.png" alt="Logo" class="w-full h-full object-cover">
+        </div>
+        <h1 id="page-title" class="text-xl font-bold text-white">ระบบสมัครชุมนุม</h1>
+       </div>
+       <div class="flex items-center gap-3">
+        <button onclick="showProfile()" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white bg-opacity-25 text-white hover:bg-opacity-35 transition-all">
+          <div id="user-avatar" class="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"><img id="user-avatar-img" src="" alt="" class="w-full h-full object-cover" style="display:none;" onerror="this.style.display='none';"> <span id="user-avatar-text" class="text-white text-sm font-bold">👤</span>
+          </div><span id="user-name-header" class="text-white font-medium">โปรไฟล์</span> 
+        </button>
+        <button onclick="logout()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors">🚪 ออก</button>
+       </div>
+      </div>
+     </div>
+    </header><!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8 relative z-10"><!-- Welcome Section -->
+    <div class="rounded-3xl p-8 mb-8 text-white fade-in shadow-md" style="background: linear-gradient(135deg, #2448eb 0%, #1f3aa6 50%, #f59e0b 100%);">
+     <h2 id="welcome-text" class="text-2xl font-bold mb-2" style="text-shadow: 0 1px 2px rgba(0,0,0,0.45);">เลือกชุมนุมที่คุณสนใจ</h2>
+     <p class="text-white/90" style="text-shadow: 0 1px 2px rgba(0,0,0,0.35);">ค้นหาชุมนุมจากหมวดหมู่กลุ่มสาระต่างๆ</p>
+    </div><!-- Search Bar -->
+     <div class="mb-8">
+      <div class="relative"><input type="text" id="search-input" oninput="handleSearch()" class="w-full px-6 py-4 pl-14 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none text-lg" placeholder="🔍 ค้นหาชุมนุม...">
+       <svg class="w-6 h-6 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+       </svg>
+      </div>
+     </div><!-- Category Filter -->
+     <div class="mb-8">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">หมวดหมู่กลุ่มสาระ</h3>
+      <div class="flex flex-wrap gap-3" id="category-filters"><button onclick="filterByCategory('all')" class="category-badge px-5 py-2 rounded-full text-white font-medium shadow-lg" style="background: linear-gradient(135deg, #2448eb 0%, #facc15 100%);" data-category="all"> ทั้งหมด </button> <button onclick="filterByCategory('คณิต')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="คณิต"> 🔢 คณิตศาสตร์ </button> <button onclick="filterByCategory('วิทย์')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="วิทย์"> 🔬 วิทยาศาสตร์ </button> <button onclick="filterByCategory('ภาษา')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="ภาษา"> 🗣️ ภาษา </button> <button onclick="filterByCategory('สังคม')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="สังคม"> 🌍 สังคมศึกษา </button> <button onclick="filterByCategory('พละ')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="พละ"> ⚽ พละและสุขศึกษา </button> <button onclick="filterByCategory('ศิลปะ&ดนตรี')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="ศิลปะ&ดนตรี"> 🎨 ศิลปะ&ดนตรี </button> <button onclick="filterByCategory('อื่นๆ')" class="category-badge px-5 py-2 rounded-full bg-gray-100 text-gray-700 font-medium hover:bg-gray-200" data-category="อื่นๆ"> 💫 อื่นๆ </button>
+      </div>
+     </div><!-- Club Grid -->
+     <div id="club-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><!-- Clubs will be rendered here -->
+     </div><!-- No Results -->
+     <div id="no-results" class="hidden text-center py-12">
+      <p class="text-6xl mb-4">🔍</p>
+      <h3 class="text-xl font-semibold text-gray-700">ไม่พบชุมนุมที่ค้นหา</h3>
+      <p class="text-gray-500 mt-2">ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น</p>
+     </div><!-- Footer -->
+     <div class="text-center mt-12 pb-8">
+      <p id="footer-text" class="text-gray-500">ติดต่อครูที่ปรึกษาหากมีข้อสงสัย</p>
+     </div>
+    </main>
+   </div><!-- Profile Modal -->
+   <div id="profile-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeProfile()"></div>
+    <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md relative z-10 fade-in max-h-[90%] overflow-y-auto"><button onclick="closeProfile()" class="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-all">
+      <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg></button>
+     <div class="text-center mb-6">
+      <div class="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative" id="profile-avatar-display" onclick="document.getElementById('avatar-input').click();" title="คลิกเพื่อเปลี่ยนรูป"><img id="profile-avatar-img" src="" alt="" class="w-full h-full object-cover" style="display:none;" onerror="this.style.display='none';"> <span id="profile-avatar-text" class="text-white text-4xl font-bold">👤</span>
+        <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity rounded-full">
+          <span class="text-white text-sm font-medium">📷</span>
+        </div>
+      </div>
+      <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="changeProfilePicture()">
+      <p class="text-gray-500 text-xs">คลิกเพื่อเปลี่ยนรูป</p>
+      <h2 class="text-2xl font-bold text-gray-800 mt-2">โปรไฟล์ของฉัน</h2>
+     </div>
+     <!-- Tab Buttons -->
+     <div class="flex gap-2 mb-6 border-b border-gray-200">
+      <button onclick="showProfileTab('info')" class="profile-tab-btn px-4 py-3 font-medium text-gray-700 border-b-2 border-transparent hover:text-blue-600" data-tab="info" style="border-bottom-color: #3b82f6; color: #3b82f6;">📋 ข้อมูลส่วนตัว</button>
+      <button onclick="showProfileTab('password')" class="profile-tab-btn px-4 py-3 font-medium text-gray-700 border-b-2 border-transparent hover:text-blue-600" data-tab="password">🔐 เปลี่ยนรหัสผ่าน</button>
+     </div>
+     <!-- Info Tab -->
+     <div id="profile-info-tab">
+      <div class="space-y-4">
+       <div class="bg-gray-50 rounded-xl p-4"><label class="block text-gray-700 text-sm font-medium mb-2">รหัสนักเรียน</label>
+        <p id="profile-student-id" class="text-gray-900 font-medium">-</p>
+       </div>
+       <div class="bg-gray-50 rounded-xl p-4"><label class="block text-gray-700 text-sm font-medium mb-2">ชื่อ-นามสกุล</label>
+        <p id="profile-student-name" class="text-gray-900 font-medium">-</p>
+       </div>
+       <div class="bg-gray-50 rounded-xl p-4"><label class="block text-gray-700 text-sm font-medium mb-2">ชั้นเรียน</label>
+        <p id="profile-student-class" class="text-gray-900 font-medium">-</p>
+       </div>
+       <div class="bg-gradient-to-r from-blue-50 to-yellow-50 border-2 border-blue-200 rounded-xl p-4"><label class="block text-blue-700 text-sm font-medium mb-3 flex items-center gap-2">
+         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+         </svg> ชุมนุมที่สมัคร </label>
+        <div id="profile-club-info">
+         <p class="text-gray-500 text-sm">ยังไม่ได้สมัครชุมนุม</p>
+        </div>
+       </div>
+      </div>
+     </div>
+     <!-- Password Tab -->
+     <div id="profile-password-tab" class="hidden">
+      <div class="space-y-4">
+       <div class="bg-gray-50 rounded-xl p-4">
+        <label class="block text-gray-700 text-sm font-medium mb-2">รหัสผ่านเก่า</label>
+        <input type="password" id="old-password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="กรุณากรอกรหัสผ่านเก่า">
+       </div>
+       <div class="bg-gray-50 rounded-xl p-4">
+        <label class="block text-gray-700 text-sm font-medium mb-2">รหัสผ่านใหม่</label>
+        <input type="password" id="new-password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="กรุณากรอกรหัสผ่านใหม่">
+       </div>
+       <div class="bg-gray-50 rounded-xl p-4">
+        <label class="block text-gray-700 text-sm font-medium mb-2">ยืนยันรหัสผ่านใหม่</label>
+        <input type="password" id="confirm-password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" placeholder="ยืนยันรหัสผ่านใหม่">
+       </div>
+       <button onclick="changePassword()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-medium transition-all mt-4">
+        💾 บันทึกรหัสผ่านใหม่
+       </button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Club Detail Modal -->
+   <div id="club-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeClubModal()"></div>
+    <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10 fade-in max-h-[90%] overflow-y-auto"><button onclick="closeClubModal()" class="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-all">
+      <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg></button>
+     <div id="club-modal-content"><!-- Club details will be rendered here -->
+     </div>
+    </div>
+   </div><!-- Toast Notification -->
+   <div id="toast" class="hidden fixed bottom-4 right-4 z-50 bg-green-500 text-white px-6 py-4 rounded-xl shadow-lg slide-in">
+    <div class="flex items-center gap-3">
+     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+     </svg><span id="toast-message"></span>
+    </div>
+   </div>
+  </div>
+
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCmDBt1LJLWUEljGQVjYcaJ5FJRm9pcM_k",
+      authDomain: "wedappis.firebaseapp.com",
+      databaseURL: "https://wedappis-default-rtdb.firebaseio.com",
+      projectId: "wedappis",
+      storageBucket: "wedappis.firebasestorage.app",
+      messagingSenderId: "838403173250",
+      appId: "1:838403173250:web:1f5fc5786c6c1104c4bd9b",
+      measurementId: "G-F73HSEZBBW"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    let currentUser = null;
+    let clubs = [];
+    let registrations = [];
+    let currentCategory = 'all';
+    let searchQuery = '';
+
+    // Category colors
+    const categoryColors = {
+      'คณิต': 'from-orange-500 to-orange-600',
+      'วิทย์': 'from-green-500 to-green-600',
+      'ภาษา': 'from-red-500 to-red-600',
+      'สังคม': 'from-yellow-500 to-yellow-600',
+      'พละ': 'from-teal-500 to-teal-600',
+      'ศิลปะ&ดนตรี': 'from-pink-500 to-pink-600',
+      'อื่นๆ': 'from-purple-500 to-purple-600'
+    };
+
+    // Initialize
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      db.ref('users/' + user.uid).once('value').then((snap) => {
+        const userData = snap.val();
+        if (!userData || userData.role !== 'student') {
+          window.location.href = 'index.html';
+          return;
+        }
+        currentUser = { uid: user.uid, ...userData };
+        loadClubs();
+        updateUserUI();
+      });
+    });
+
+    function loadClubs() {
+      db.ref('clubs').on('value', (snap) => {
+        clubs = [];
+        if (snap.exists()) {
+          snap.forEach((child) => {
+            clubs.push({ __backendId: child.key, id: child.key, ...child.val() });
+          });
+        }
+        renderClubs();
+      });
+
+      db.ref('registrations').on('value', (snap) => {
+        registrations = [];
+        if (snap.exists()) {
+          snap.forEach((child) => {
+            registrations.push({ id: child.key, ...child.val() });
+          });
+        }
+        renderClubs();
+        updateProfileClubInfo();
+      });
+    }
+
+    function getClubMemberCount(clubId) {
+      return registrations.filter(r => r.club_id === clubId).length;
+    }
+
+    function getStudentRegistration(studentId) {
+      return registrations.find(r => r.student_id === studentId);
+    }
+
+    function updateUserUI() {
+      if (currentUser) {
+        document.getElementById('user-name-header').textContent = `${currentUser.firstname || ''} ${currentUser.lastname || ''}`;
+        
+        // Show avatar in header
+        if (currentUser.avatar) {
+          const img = document.getElementById('user-avatar-img');
+          const text = document.getElementById('user-avatar-text');
+          img.src = currentUser.avatar;
+          img.style.display = 'block';
+          text.style.display = 'none';
+        }
+      }
+    }
+
+    function updateProfileClubInfo() {
+      if (!currentUser) return;
+      const reg = getStudentRegistration(currentUser.studentId);
+      const clubInfo = document.getElementById('profile-club-info');
+
+      if (!reg) {
+        clubInfo.innerHTML = '<p class="text-gray-500 text-sm">ยังไม่ได้สมัครชุมนุม</p>';
+        return;
+      }
+
+      const club = clubs.find(c => c.__backendId === reg.club_id);
+      if (!club) {
+        clubInfo.innerHTML = '<p class="text-gray-500 text-sm">ยังไม่ได้สมัครชุมนุม</p>';
+        return;
+      }
+
+      const date = reg.registered_at ? new Date(reg.registered_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ไม่ทราบ';
+      clubInfo.innerHTML = `
+        <div class="space-y-2 text-sm text-blue-700">
+          <p><strong>${club.name}</strong></p>
+          <p>หมวดหมู่: ${club.category || '-'}</p>
+          <p>👨‍🏫 ${club.teacher || '-'}</p>
+          <p>📅 สมัครเมื่อ: ${date}</p>
+        </div>
+      `;
+    }
+
+    function filterByCategory(category) {
+      currentCategory = category;
+      document.querySelectorAll('[data-category]').forEach(btn => {
+        if (btn.dataset.category === category) {
+          btn.style.background = 'linear-gradient(135deg, #2448eb 0%, #facc15 100%)';
+          btn.classList.add('text-white', 'shadow-lg');
+          btn.classList.remove('bg-gray-100', 'text-gray-700');
+        } else {
+          btn.style.background = '';
+          btn.classList.remove('text-white', 'shadow-lg');
+          btn.classList.add('bg-gray-100', 'text-gray-700');
+        }
+      });
+      renderClubs();
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('search-input').value.toLowerCase();
+      renderClubs();
+    }
+
+    function renderClubs() {
+      const grid = document.getElementById('club-grid');
+      const noResults = document.getElementById('no-results');
+      
+      let filtered = clubs;
+
+      if (currentCategory !== 'all') {
+        filtered = filtered.filter(c => c.category === currentCategory);
+      }
+
+      if (searchQuery) {
+        filtered = filtered.filter(c => 
+          c.name.toLowerCase().includes(searchQuery) ||
+          c.description.toLowerCase().includes(searchQuery) ||
+          (c.teacher || '').toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        noResults.classList.remove('hidden');
+        return;
+      }
+
+      noResults.classList.add('hidden');
+
+      grid.innerHTML = filtered.map(club => {
+        const memberCount = getClubMemberCount(club.id);
+        const isFull = memberCount >= (club.max_members || 30);
+        const reg = getStudentRegistration(currentUser.studentId);
+        const isRegistered = reg && reg.club_id === club.id;
+        const colorClass = categoryColors[club.category] || 'from-blue-500 to-blue-600';
+
+        return `
+          <div class="bg-white rounded-2xl shadow-lg overflow-hidden card-hover cursor-pointer" onclick="showClubDetail('${club.id}')">
+            <div class="bg-gradient-to-r ${colorClass} p-6 text-white">
+              <div class="text-4xl mb-3">📚</div>
+              <h3 class="text-lg font-bold">${club.name || 'ไม่ระบุชื่อ'}</h3>
+              <p class="text-white/80 text-sm mt-1">${club.category || '-'}</p>
+            </div>
+            <div class="p-5">
+              <p class="text-gray-600 text-sm mb-4 line-clamp-2">${club.description || 'ไม่มีรายละเอียด'}</p>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-500">${memberCount}/${club.max_members || 30} คน</span>
+                ${isRegistered ? '<span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-medium">✓ สมัครแล้ว</span>' : 
+                  isFull ? '<span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">เต็ม</span>' : 
+                  '<span class="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs font-medium">เปิดรับสมัคร</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showClubDetail(clubId) {
+      const club = clubs.find(c => c.__backendId === clubId);
+      if (!club) return;
+
+      const memberCount = getClubMemberCount(clubId);
+      const isFull = memberCount >= (club.max_members || 30);
+      const reg = getStudentRegistration(currentUser.studentId);
+      const isRegistered = reg && reg.club_id === clubId;
+      const hasOtherClub = reg && reg.club_id !== clubId;
+      const colorClass = categoryColors[club.category] || 'from-blue-500 to-blue-600';
+
+      const members = registrations.filter(r => r.club_id === clubId);
+
+      let html = `
+        <div class="bg-gradient-to-r ${colorClass} -mx-8 -mt-8 p-8 text-white rounded-t-3xl">
+          <div class="text-6xl mb-4">📚</div>
+          <h2 class="text-2xl font-bold">${club.name || 'ไม่ระบุชื่อ'}</h2>
+          <p class="text-white/80 mt-2">${club.category || '-'}</p>
+        </div>
+        
+        <div class="mt-6 space-y-4">
+          <p class="text-gray-600">${club.description || 'ไม่มีรายละเอียด'}</p>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-gray-500 text-sm">ครูที่ปรึกษา</p>
+              <p class="font-medium text-gray-800">${club.teacher || '-'}</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-gray-500 text-sm">สมาชิก</p>
+              <p class="font-medium text-gray-800">${memberCount}/${club.max_members || 30}</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-gray-500 text-sm">ความเต็ม</p>
+              <p class="font-medium">${Math.round((memberCount/(club.max_members || 30))*100)}%</p>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="h-2 rounded-full transition-all" style="background: linear-gradient(135deg, #2448eb 0%, #facc15 100%); width: ${(memberCount/(club.max_members || 30))*100}%"></div>
+            </div>
+          </div>
+
+          ${members.length > 0 ? `
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-gray-500 text-sm mb-3">รายชื่อสมาชิก (${members.length})</p>
+              <div class="space-y-2 max-h-32 overflow-y-auto text-sm">
+                ${members.map((m, idx) => `<p class="text-gray-700">${idx + 1}. ${m.student_name} (${m.student_class})</p>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${isRegistered ? `
+            <button onclick="cancelRegistration('${clubId}')" id="cancel-btn-${clubId}" class="w-full bg-red-500 text-white py-3 rounded-xl font-medium hover:bg-red-600 transition-all">
+              ยกเลิกการสมัคร
+            </button>
+          ` : hasOtherClub ? `
+            <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700 text-sm">
+              ⚠️ คุณได้สมัครชุมนุมอื่นแล้ว
+            </div>
+          ` : isFull ? `
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm">
+              ❌ ชุมนุมเต็มแล้ว
+            </div>
+          ` : `
+            <button onclick="registerClub('${clubId}')" id="register-btn-${clubId}" class="w-full text-white py-3 rounded-xl font-medium hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(135deg, #2448eb 0%, #facc15 100%);">
+              สมัครชุมนุมนี้
+            </button>
+          `}
+        </div>
+      `;
+
+      document.getElementById('club-modal-content').innerHTML = html;
+      document.getElementById('club-modal').classList.remove('hidden');
+    }
+
+    function closeClubModal() {
+      document.getElementById('club-modal').classList.add('hidden');
+    }
+
+    function showProfile() {
+      if (!currentUser) return;
+      
+      // Load avatar from Firebase
+      if (currentUser.avatar) {
+        const img = document.getElementById('profile-avatar-img');
+        const text = document.getElementById('profile-avatar-text');
+        img.src = currentUser.avatar;
+        img.style.display = 'block';
+        text.style.display = 'none';
+      }
+      
+      document.getElementById('profile-student-id').textContent = currentUser.studentId || '-';
+      document.getElementById('profile-student-name').textContent = `${currentUser.firstname || ''} ${currentUser.lastname || ''}`;
+      document.getElementById('profile-student-class').textContent = `${currentUser.level || ''}/${currentUser.room || ''}`;
+      updateProfileClubInfo();
+      document.getElementById('profile-modal').classList.remove('hidden');
+    }
+
+    function closeProfile() {
+      document.getElementById('profile-modal').classList.add('hidden');
+    }
+
+    function showProfileTab(tab) {
+      const infoTab = document.getElementById('profile-info-tab');
+      const passwordTab = document.getElementById('profile-password-tab');
+      const buttons = document.querySelectorAll('.profile-tab-btn');
+
+      buttons.forEach(btn => {
+        if (btn.dataset.tab === tab) {
+          btn.style.borderBottomColor = '#3b82f6';
+          btn.style.color = '#3b82f6';
+        } else {
+          btn.style.borderBottomColor = 'transparent';
+          btn.style.color = '#374151';
+        }
+      });
+
+      if (tab === 'info') {
+        infoTab.classList.remove('hidden');
+        passwordTab.classList.add('hidden');
+      } else {
+        infoTab.classList.add('hidden');
+        passwordTab.classList.remove('hidden');
+        // Clear password fields
+        document.getElementById('old-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+      }
+    }
+
+    async function changePassword() {
+      const oldPass = document.getElementById('old-password').value;
+      const newPass = document.getElementById('new-password').value;
+      const confirmPass = document.getElementById('confirm-password').value;
+
+      if (!oldPass || !newPass || !confirmPass) {
+        showToast('กรุณากรอกข้อมูลให้ครบถ้วน');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showToast('รหัสผ่านใหม่ไม่ตรงกัน');
+        return;
+      }
+
+      if (newPass.length < 6) {
+        showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+        return;
+      }
+
+      try {
+        // Re-authenticate first
+        const credential = firebase.auth.EmailAuthProvider.credential(
+          auth.currentUser.email,
+          oldPass
+        );
+        
+        await auth.currentUser.reauthenticateWithCredential(credential);
+        
+        // Update password
+        await auth.currentUser.updatePassword(newPass);
+        
+        showToast('เปลี่ยนรหัสผ่านสำเร็จ!');
+        document.getElementById('old-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+      } catch (err) {
+        if (err.code === 'auth/wrong-password') {
+          showToast('รหัสผ่านเก่าไม่ถูกต้อง');
+        } else if (err.code === 'auth/weak-password') {
+          showToast('รหัสผ่านใหม่อ่อนเกินไป');
+        } else {
+          showToast('เกิดข้อผิดพลาด: ' + err.message);
+        }
+      }
+    }
+
+    // Compress image file using canvas and return a dataURL
+    function compressImage(file, maxWidth = 800, maxHeight = 800, initialQuality = 0.92) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read_error'));
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('image_error'));
+          img.onload = () => {
+            let { width, height } = img;
+            // Calculate new size while preserving aspect ratio
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Try iterative compression to target <= 2MB
+            let quality = initialQuality;
+            function toData(qual) {
+              try {
+                const dataURL = canvas.toDataURL('image/jpeg', qual);
+                return dataURL;
+              } catch (err) {
+                return null;
+              }
+            }
+
+            let dataURL = toData(quality);
+            // If initial conversion failed, reject
+            if (!dataURL) return reject(new Error('compress_error'));
+
+            // Helper to compute approx bytes from base64
+            function dataURLSizeBytes(d) {
+              const base64 = d.split(',')[1] || '';
+              return Math.round(base64.length * 3 / 4);
+            }
+
+            const MAX_BYTES = 2 * 1024 * 1024; // 2MB
+            while (dataURLSizeBytes(dataURL) > MAX_BYTES && quality > 0.45) {
+              quality -= 0.07;
+              dataURL = toData(quality);
+              if (!dataURL) break;
+            }
+
+            resolve(dataURL);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function changeProfilePicture() {
+      const file = document.getElementById('avatar-input').files[0];
+      if (!file) return;
+
+      if (!file.type || !file.type.startsWith('image/')) {
+        showToast('กรุณาเลือกไฟล์รูปภาพหรือ GIF เท่านั้น');
+        return;
+      }
+
+      // If GIF, avoid lossy compression (animated gifs would lose animation). Only accept small GIFs.
+      if (file.type === 'image/gif') {
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('ไฟล์ GIF มีขนาดใหญ่เกินไป โปรดลองไฟล์ขนาดเล็กหรือใช้ภาพ JPG/PNG');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataURL = e.target.result;
+          const img = document.getElementById('profile-avatar-img');
+          const text = document.getElementById('profile-avatar-text');
+          img.src = dataURL;
+          img.style.display = 'block';
+          text.style.display = 'none';
+
+          db.ref('users/' + currentUser.uid).update({ avatar: dataURL })
+            .then(() => {
+              currentUser.avatar = dataURL;
+              const headerImg = document.getElementById('user-avatar-img');
+              const headerText = document.getElementById('user-avatar-text');
+              if (headerImg) {
+                headerImg.src = dataURL;
+                headerImg.style.display = 'block';
+              }
+              if (headerText) headerText.style.display = 'none';
+              showToast('บันทึกรูปภาพสำเร็จ!');
+            })
+            .catch(() => showToast('เกิดข้อผิดพลาด'));
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // For other image types, run compression
+      try {
+        showToast('กำลังบีบอัดรูปภาพ...');
+        const compressedDataURL = await compressImage(file, 800, 800, 0.92);
+
+        // Validate compressed size
+        const base64 = compressedDataURL.split(',')[1] || '';
+        const byteSize = Math.round(base64.length * 3 / 4);
+        if (byteSize > 2 * 1024 * 1024) {
+          showToast('ยังบีบอัดไฟล์ไม่พอ โปรดลองเลือกรูปภาพขนาดเล็กลง');
+          return;
+        }
+
+        // Update UI with compressed image
+        const img = document.getElementById('profile-avatar-img');
+        const text = document.getElementById('profile-avatar-text');
+        img.src = compressedDataURL;
+        img.style.display = 'block';
+        text.style.display = 'none';
+
+        // Save compressed to Firebase
+        await db.ref('users/' + currentUser.uid).update({ avatar: compressedDataURL });
+        currentUser.avatar = compressedDataURL;
+        const headerImg = document.getElementById('user-avatar-img');
+        const headerText = document.getElementById('user-avatar-text');
+        if (headerImg) {
+          headerImg.src = compressedDataURL;
+          headerImg.style.display = 'block';
+        }
+        if (headerText) headerText.style.display = 'none';
+        showToast('บันทึกรูปภาพสำเร็จ!');
+      } catch (err) {
+        console.error(err);
+        showToast('ไม่สามารถบีบอัดรูปภาพได้');
+      }
+    }
+
+    async function registerClub(clubId) {
+      if (!currentUser) return;
+      const btn = document.getElementById(`register-btn-${clubId}`);
+      btn.disabled = true;
+      btn.textContent = 'กำลังสมัคร...';
+
+      try {
+        await db.ref('registrations').push().set({
+          type: 'registration',
+          student_id: currentUser.studentId,
+          student_name: `${currentUser.firstname} ${currentUser.lastname}`,
+          student_class: `${currentUser.level}/${currentUser.room}`,
+          club_id: clubId,
+          registered_at: firebase.database.ServerValue.TIMESTAMP
+        });
+        showToast('สมัครสำเร็จ!');
+        closeClubModal();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'สมัครชุมนุมนี้';
+        showToast('เกิดข้อผิดพลาด');
+      }
+    }
+
+    async function cancelRegistration(clubId) {
+      if (!currentUser) return;
+      const btn = document.getElementById(`cancel-btn-${clubId}`);
+      btn.disabled = true;
+      btn.textContent = 'กำลังยกเลิก...';
+
+      try {
+        const reg = registrations.find(r => r.student_id === currentUser.studentId && r.club_id === clubId);
+        if (reg && reg.id) {
+          await db.ref('registrations/' + reg.id).remove();
+        }
+        showToast('ยกเลิกแล้ว');
+        closeClubModal();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'ยกเลิกการสมัคร';
+        showToast('เกิดข้อผิดพลาด');
+      }
+    }
+
+    function logout() {
+      Swal.fire({
+        icon: 'question',
+        title: 'ออกจากระบบ',
+        text: 'คุณต้องการออกจากระบบหรือไม่?',
+        showCancelButton: true,
+        confirmButtonText: 'ออก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#6366f1',
+        didOpen: () => {
+          Swal.hideLoading();
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.close();
+          auth.signOut().then(() => {
+            window.location.href = 'index.html';
+          });
+        }
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-message').textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+  </script>
+ </body>
+</html>
